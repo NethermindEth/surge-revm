@@ -1,5 +1,18 @@
+use std::sync::LazyLock;
+
+pub mod trusted_setup_points;
+
 cfg_if::cfg_if! {
     if #[cfg(feature = "c-kzg")] {
+
+        static ETHEREUM_KZG_SETTINGS: LazyLock<c_kzg::KzgSettings> = LazyLock::new(|| {
+            c_kzg::KzgSettings::load_trusted_setup(
+                &trusted_setup_points::G1_POINTS.0,
+                &trusted_setup_points::G2_POINTS.0
+            ).expect("failed to load trusted setup")
+        });
+
+
         pub use c_kzg::KzgSettings;
         /// KZG Settings that allow us to specify a custom trusted setup.
         /// or use hardcoded default settings.
@@ -19,13 +32,26 @@ cfg_if::cfg_if! {
             pub fn get(&self) -> &c_kzg::KzgSettings {
                 match self {
                     Self::Default => {
-                        c_kzg::ethereum_kzg_settings()
+                        &ETHEREUM_KZG_SETTINGS
                     }
                     Self::Custom(settings) => settings,
                 }
             }
         }
+
     } else if #[cfg(feature = "kzg-rs")] {
         pub use kzg_rs::{KzgSettings,EnvKzgSettings};
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[cfg(feature = "c-kzg")]
+    fn test_output_ethereum_kzg_settings() {
+        let settings = &*ETHEREUM_KZG_SETTINGS;
+        println!("{:?}", settings);
     }
 }
