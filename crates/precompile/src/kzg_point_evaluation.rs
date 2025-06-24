@@ -38,6 +38,8 @@ pub const RETURN_VALUE: &[u8; 64] = &hex!(
 /// |     32         | 32  | 32  |     48     |   48  |
 /// with z and y being padded 32 byte big endian values
 pub fn run(input: &[u8], gas_limit: u64) -> PrecompileResult {
+    #[cfg(feature = "sp1-cycle-tracker")]
+    println!("cycle-tracker-start: kzg");
     if gas_limit < GAS_COST {
         return Err(PrecompileError::OutOfGas);
     }
@@ -62,6 +64,8 @@ pub fn run(input: &[u8], gas_limit: u64) -> PrecompileResult {
     if !verify_kzg_proof(commitment, z, y, proof) {
         return Err(PrecompileError::BlobVerifyKzgProofFailed);
     }
+    #[cfg(feature = "sp1-cycle-tracker")]
+    println!("cycle-tracker-end: kzg");
 
     // Return FIELD_ELEMENTS_PER_BLOB and BLS_MODULUS as padded 32 byte big endian values
     Ok(PrecompileOutput::new(GAS_COST, RETURN_VALUE.into()))

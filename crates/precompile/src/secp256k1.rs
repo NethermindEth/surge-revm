@@ -25,6 +25,30 @@ use crate::{
 };
 use primitives::{alloy_primitives::B512, Bytes, B256};
 
+#[allow(clippy::module_inception)]
+mod secp256k1_zk {
+    use crate::zk_op::{self, ZkOperation};
+    use crate::PrecompileError;
+    use primitives::{alloy_primitives::B512, B256};
+
+    pub(crate) fn ecrecover(sig: &B512, recid: u8, msg: &B256) -> Result<B256, PrecompileError> {
+        #[cfg(feature = "sp1-cycle-tracker")]
+        println!("cycle-tracker-start: ecrecover");
+        let res = if zk_op::contains_operation(&ZkOperation::Secp256k1) {
+            zk_op::ZKVM_OPERATOR
+                .get()
+                .unwrap()
+                .secp256k1_ecrecover(sig, recid, msg)
+                .map(Into::<B256>::into)
+        } else {
+            super::ecrecover(sig, recid, msg).map_err(|e| PrecompileError::Other(e.to_string()))
+        };
+        #[cfg(feature = "sp1-cycle-tracker")]
+        println!("cycle-tracker-end: ecrecover");
+        res
+    }
+}
+
 /// `ecrecover` precompile, containing address and function to run.
 pub const ECRECOVER: PrecompileWithAddress =
     PrecompileWithAddress(crate::u64_to_address(1), ec_recover_run);
@@ -48,9 +72,9 @@ pub fn ec_recover_run(input: &[u8], gas_limit: u64) -> PrecompileResult {
     let recid = input[63] - 27;
     let sig = <&B512>::try_from(&input[64..128]).unwrap();
 
-    let res = ecrecover(sig, recid, msg);
-
-    let out = res.map(|o| o.to_vec().into()).unwrap_or_default();
+    let out = secp256k1_zk::ecrecover(sig, recid, msg)
+        .map(|o| o.to_vec().into())
+        .unwrap_or_default();
     Ok(PrecompileOutput::new(ECRECOVER_BASE, out))
 }
 

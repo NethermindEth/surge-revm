@@ -23,6 +23,7 @@ pub mod secp256k1;
 #[cfg(feature = "secp256r1")]
 pub mod secp256r1;
 pub mod utilities;
+pub mod zk_op;
 
 pub use interface::*;
 
