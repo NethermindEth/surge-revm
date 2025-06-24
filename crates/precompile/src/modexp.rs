@@ -1,5 +1,6 @@
 //! Modexp precompile added in [`EIP-198`](https://eips.ethereum.org/EIPS/eip-198)
 //! and reprices in berlin hardfork with [`EIP-2565`](https://eips.ethereum.org/EIPS/eip-2565).
+use crate::zk_op::{self, ZkOperation};
 use crate::{
     utilities::{left_pad, left_pad_vec, right_pad_vec, right_pad_with_offset},
     PrecompileError, PrecompileOutput, PrecompileResult, PrecompileWithAddress,
@@ -69,6 +70,8 @@ pub fn run_inner<F, const OSAKA: bool>(
 where
     F: FnOnce(u64, u64, u64, &U256) -> u64,
 {
+    #[cfg(feature = "sp1-cycle-tracker")]
+    println!("cycle-tracker-start: modexp");
     // If there is no minimum gas, return error.
     if min_gas > gas_limit {
         return Err(PrecompileError::OutOfGas);
@@ -134,9 +137,18 @@ where
     debug_assert_eq!(modulus.len(), mod_len);
 
     // Call the modexp.
-    let output = modexp(base, exponent, modulus);
-
-    // Left pad the result to modulus length. bytes will always by less or equal to modulus length.
+    let output = if zk_op::contains_operation(&ZkOperation::Modexp) {
+        zk_op::ZKVM_OPERATOR
+            .get()
+            .unwrap()
+            .modexp_run(base, exponent, modulus)
+            .unwrap()
+    } else {
+        modexp(base, exponent, modulus)
+    };
+    #[cfg(feature = "sp1-cycle-tracker")]
+    println!("cycle-tracker-end: modexp");
+    // left pad the result to modulus length. bytes will always by less or equal to modulus length.
     Ok(PrecompileOutput::new(
         gas_cost,
         left_pad_vec(&output, mod_len).into_owned().into(),

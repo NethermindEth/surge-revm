@@ -37,8 +37,14 @@ alloy-sol-types.workspace = true
 hash-db.workspace = true
 indicatif.workspace = true
 plain_hasher.workspace = true
-serde = { workspace = true, features = ["derive", "rc"] }
-serde_json = { workspace = true, features = ["preserve_order"] }
+serde = { workspace = true, default-features = false, features = [
+    "derive",
+    "rc",
+] }
+serde_json = { workspace = true, default-features = false, features = [
+    "alloc",
+    "preserve_order",
+] }
 clap.workspace = true
 thiserror.workspace = true
 triehash.workspace = true
@@ -48,3 +54,8 @@ k256 = { workspace = true, features = ["ecdsa"] }
 [[bench]]
 name = "evm"
 harness = false
+
+
+[features]
+default = ["std"]
+std = ["serde/std", "serde_json/std", "alloy-rlp/std", "revm/std"]

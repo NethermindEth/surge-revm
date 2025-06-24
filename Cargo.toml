@@ -19,6 +19,7 @@ members = [
     # variants
     "crates/op-revm",
     "crates/inspector",
+    "crates/taiko-revm",
 
     # utility
     "crates/statetest-types",
@@ -53,6 +54,7 @@ context = { path = "crates/context", package = "revm-context", version = "5.0.0"
 context-interface = { path = "crates/context/interface", package = "revm-context-interface", version = "5.0.0", default-features = false }
 handler = { path = "crates/handler", package = "revm-handler", version = "5.0.0", default-features = false }
 op-revm = { path = "crates/op-revm", package = "op-revm", version = "5.0.0", default-features = false }
+taiko-revm = { path = "crates/taiko-revm", package = "taiko-revm", version = "1.0.0", default-features = false }
 
 # alloy 
 alloy-eip2930 = { version = "0.2.1", default-features = false }

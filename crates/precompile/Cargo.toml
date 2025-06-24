@@ -26,13 +26,13 @@ once_cell = { workspace = true, features = ["alloc"] }
 # ecRecover
 k256 = { workspace = true, features = ["ecdsa"] }
 secp256k1 = { workspace = true, features = [
-	"alloc",
-	"recovery",
-	"rand",
-	"global-context",
+    "alloc",
+    "recovery",
+    "rand",
+    "global-context",
 ], optional = true }
 libsecp256k1 = { workspace = true, features = [
-	"static-context",
+    "static-context",
 ], optional = true }
 
 # SHA2-256 and RIPEMD-160
@@ -53,9 +53,8 @@ ark-serialize = { workspace = true }
 
 # KZG point evaluation precompile
 c-kzg = { workspace = true, optional = true, features = [
-	"ethereum_kzg_settings",
+    "ethereum_kzg_settings",
 ] }
-
 # Optionally use `kzg-rs` for a pure Rust implementation of KZG point evaluation.
 kzg-rs = { workspace = true, optional = true }
 
@@ -77,23 +76,22 @@ rand = { workspace = true, features = ["std"] }
 rstest.workspace = true
 
 [features]
-default = ["std", "c-kzg", "secp256k1", "portable", "blst"]
 std = [
-	"primitives/std",
-	"k256/std",
-	"once_cell/std",
-	"ripemd/std",
-	"sha2/std",
-	"c-kzg?/std",
-	"secp256k1?/std",
-	"libsecp256k1?/std",
-	"aurora-engine-modexp/std",
-	"p256?/std",
-	"ark-bn254/std",
-	"ark-bls12-381/std",
-	"ark-ec/std",
-	"ark-ff/std",
-	"ark-serialize/std",
+    "primitives/std",
+    "k256/std",
+    "once_cell/std",
+    "ripemd/std",
+    "sha2/std",
+    "c-kzg?/std",
+    "secp256k1?/std",
+    "libsecp256k1?/std",
+    "aurora-engine-modexp/std",
+    "p256?/std",
+    "ark-bn254/std",
+    "ark-bls12-381/std",
+    "ark-ec/std",
+    "ark-ff/std",
+    "ark-serialize/std",
 ]
 hashbrown = ["primitives/hashbrown"]
 asm-keccak = ["primitives/asm-keccak"]
@@ -117,8 +115,8 @@ portable = ["c-kzg?/portable", "blst?/portable"]
 # In Linux it passes. If you don't require to build wasm on win/mac, it is safe to use it and it is enabled by default.
 secp256k1 = ["dep:secp256k1"]
 libsecp256k1 = ["dep:libsecp256k1"]
-
-# Enables the blst implementation of the BLS12-381 precompile.
+sp1-cycle-tracker = []
+# Enables the BLS12-381 precompiles.
 blst = ["dep:blst"]
 
 # Enables the substrate implementation of eip1962
