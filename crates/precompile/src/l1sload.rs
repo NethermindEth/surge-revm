@@ -31,6 +31,12 @@ pub fn set_l1_storage_value(
     }
 }
 
+pub fn clear_l1_storage_cache() {
+    if let Ok(mut cache) = L1_STORAGE_CACHE.lock() {
+        cache.clear();
+    }
+}
+
 /// Get a value from the L1 storage cache
 fn get_l1_storage_value(
     contract_address: Address,
@@ -43,12 +49,6 @@ fn get_l1_storage_value(
             .copied()
     } else {
         None
-    }
-}
-
-pub fn clear_l1_storage_cache() {
-    if let Ok(mut cache) = L1_STORAGE_CACHE.lock() {
-        cache.clear();
     }
 }
 
