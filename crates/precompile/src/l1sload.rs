@@ -46,6 +46,12 @@ fn get_l1_storage_value(
     }
 }
 
+pub fn clear_l1_storage_cache() {
+    if let Ok(mut cache) = L1_STORAGE_CACHE.lock() {
+        cache.clear();
+    }
+}
+
 /// L1SLOAD precompile - read storage values from L1 contracts (RIP-7728).
 ///
 /// The input to the L1SLOAD precompile consists of:
@@ -82,9 +88,8 @@ pub fn l1sload_run(input: &Bytes, gas_limit: u64) -> PrecompileResult {
             Ok(PrecompileOutput::new(gas_used, Bytes::from(output)))
         }
         None => {
-            // Return zero value if no cached data found
-            let output = [0u8; 32];
-            Ok(PrecompileOutput::new(gas_used, Bytes::from(output)))
+            // Return error if no cached data found
+            Err(Error::Other("L1 storage value not found in cache".into()).into())
         }
     }
 }
@@ -93,59 +98,154 @@ pub fn l1sload_run(input: &Bytes, gas_limit: u64) -> PrecompileResult {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_l1sload_invalid_input_length() {
-        let short_input = Bytes::from(vec![0u8; 80]); // Too short
-        let result = l1sload_run(&short_input, 1000);
-        assert!(result.is_err());
+    const TEST_ADDRESS: [u8; 20] = [1u8; 20];
+    const TEST_STORAGE_KEY: [u8; 32] = [2u8; 32];
+    const TEST_BLOCK_NUMBER: [u8; 32] = [3u8; 32];
+    const TEST_STORAGE_VALUE: [u8; 32] = [5u8; 32];
+    const SUFFICIENT_GAS: u64 = L1SLOAD_FIXED_GAS + L1SLOAD_PER_LOAD_GAS;
+    const INSUFFICIENT_GAS: u64 = SUFFICIENT_GAS - 1;
 
-        let long_input = Bytes::from(vec![0u8; 100]); // Too long
-        let result = l1sload_run(&long_input, 1000);
-        assert!(result.is_err());
+    /// Helper function to create test input with predefined test data
+    fn create_test_input() -> Vec<u8> {
+        let mut input = vec![0u8; EXPECTED_INPUT_LENGTH];
+        input[0..20].copy_from_slice(&TEST_ADDRESS);
+        input[20..52].copy_from_slice(&TEST_STORAGE_KEY);
+        input[52..84].copy_from_slice(&TEST_BLOCK_NUMBER);
+        input
+    }
+
+    /// Helper function to setup storage cache with test data
+    fn setup_test_storage() -> (Address, B256, B256, B256) {
+        let address = Address::from(TEST_ADDRESS);
+        let key = B256::from(TEST_STORAGE_KEY);
+        let block = B256::from(TEST_BLOCK_NUMBER);
+        let value = B256::from(TEST_STORAGE_VALUE);
+
+        set_l1_storage_value(address, key, block, value);
+        (address, key, block, value)
     }
 
     #[test]
-    fn test_l1sload_valid_input() {
-        let mut input = vec![0u8; EXPECTED_INPUT_LENGTH];
+    fn test_l1sload_rejects_invalid_input_lengths() {
+        clear_l1_storage_cache();
 
-        // Set contract address (20 bytes)
-        input[0..20].copy_from_slice(&[1u8; 20]);
+        // Test input too short
+        let short_input = Bytes::from(vec![0u8; 80]);
+        let result = l1sload_run(&short_input, SUFFICIENT_GAS);
+        assert!(result.is_err(), "Should reject too short input");
 
-        // Set storage key (32 bytes)
-        input[20..52].copy_from_slice(&[2u8; 32]);
+        // Test input too long
+        let long_input = Bytes::from(vec![0u8; 100]);
+        let result = l1sload_run(&long_input, SUFFICIENT_GAS);
+        assert!(result.is_err(), "Should reject too long input");
+    }
 
-        // Set block number (32 bytes)
-        input[52..84].copy_from_slice(&[3u8; 32]);
+    #[test]
+    fn test_l1sload_fails_without_cached_storage() {
+        clear_l1_storage_cache();
 
-        let result = l1sload_run(&Bytes::from(input), 1000);
-        assert!(result.is_ok());
+        let input = create_test_input();
+        let result = l1sload_run(&Bytes::from(input), SUFFICIENT_GAS);
+
+        assert!(
+            result.is_err(),
+            "Should fail when storage value is not cached"
+        );
+    }
+
+    #[test]
+    fn test_l1sload_succeeds_with_cached_storage() {
+        clear_l1_storage_cache();
+
+        // Setup test data and cache
+        let (_, _, _, expected_value) = setup_test_storage();
+        let input = create_test_input();
+
+        let result = l1sload_run(&Bytes::from(input), SUFFICIENT_GAS);
+        assert!(
+            result.is_ok(),
+            "Should succeed when storage value is cached"
+        );
 
         let output = result.unwrap();
-        assert_eq!(output.gas_used, L1SLOAD_FIXED_GAS + L1SLOAD_PER_LOAD_GAS);
-        assert_eq!(output.bytes.len(), 32);
+
+        // Verify gas usage
+        let expected_gas = L1SLOAD_FIXED_GAS + L1SLOAD_PER_LOAD_GAS;
+        assert_eq!(
+            output.gas_used, expected_gas,
+            "Gas usage should be fixed cost + per-load cost"
+        );
+
+        // Verify output length
+        assert_eq!(output.bytes.len(), 32, "Output should be exactly 32 bytes");
+
+        // Verify output content matches stored value
+        assert_eq!(
+            output.bytes.as_ref(),
+            &expected_value.0,
+            "Output should match the cached storage value"
+        );
     }
 
     #[test]
-    fn test_l1sload_out_of_gas() {
+    fn test_l1sload_fails_with_insufficient_gas() {
+        clear_l1_storage_cache();
+
         let input = Bytes::from(vec![0u8; EXPECTED_INPUT_LENGTH]);
-        let result = l1sload_run(&input, 50); // Not enough gas
-        assert!(result.is_err());
+        let result = l1sload_run(&input, INSUFFICIENT_GAS);
+
+        assert!(
+            result.is_err(),
+            "Should fail when gas limit is insufficient"
+        );
     }
 
     #[test]
-    fn test_cache_functionality() {
-        let address = Address::from_slice(&[1u8; 20]);
-        let key = B256::from_slice(&[2u8; 32]);
-        let block = B256::from_slice(&[3u8; 32]);
-        let value = B256::from_slice(&[5u8; 32]);
+    fn test_storage_cache_operations() {
+        clear_l1_storage_cache();
 
-        // Initially no data
-        assert!(get_l1_storage_value(address, key, block).is_none());
+        let address = Address::from(TEST_ADDRESS);
+        let key = B256::from(TEST_STORAGE_KEY);
+        let block = B256::from(TEST_BLOCK_NUMBER);
+        let value = B256::from(TEST_STORAGE_VALUE);
 
-        // Set data
+        // Verify cache is initially empty
+        assert!(
+            get_l1_storage_value(address, key, block).is_none(),
+            "Cache should be empty initially"
+        );
+
         set_l1_storage_value(address, key, block, value);
+        assert_eq!(
+            get_l1_storage_value(address, key, block),
+            Some(value),
+            "Should retrieve the cached value"
+        );
+    }
 
-        // Now data exists
-        assert_eq!(get_l1_storage_value(address, key, block), Some(value));
+    #[test]
+    fn test_cache_key_uniqueness() {
+        clear_l1_storage_cache();
+
+        let address1 = Address::from([1u8; 20]);
+        let address2 = Address::from([2u8; 20]);
+        let key1 = B256::from([1u8; 32]);
+        let key2 = B256::from([2u8; 32]);
+        let block1 = B256::from([1u8; 32]);
+        let block2 = B256::from([2u8; 32]);
+        let value1 = B256::from([10u8; 32]);
+        let value2 = B256::from([20u8; 32]);
+
+        // Set different values for different cache keys
+        set_l1_storage_value(address1, key1, block1, value1);
+        set_l1_storage_value(address2, key2, block2, value2);
+
+        // Verify each key returns its correct value
+        assert_eq!(get_l1_storage_value(address1, key1, block1), Some(value1));
+        assert_eq!(get_l1_storage_value(address2, key2, block2), Some(value2));
+
+        // Verify non-existent combinations return None
+        assert!(get_l1_storage_value(address1, key2, block1).is_none());
+        assert!(get_l1_storage_value(address2, key1, block2).is_none());
     }
 }
