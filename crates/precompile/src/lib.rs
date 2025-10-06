@@ -17,6 +17,7 @@ pub mod hash;
 pub mod identity;
 #[cfg(any(feature = "c-kzg", feature = "kzg-rs"))]
 pub mod kzg_point_evaluation;
+pub mod l1sload;
 pub mod modexp;
 pub mod secp256k1;
 #[cfg(feature = "secp256r1")]
@@ -25,6 +26,7 @@ pub mod utilities;
 pub mod zk_op;
 
 pub use fatal_precompile::fatal_precompile;
+pub use l1sload::{set_l1_storage_value, L1SLOAD};
 
 #[cfg(all(feature = "c-kzg", feature = "kzg-rs"))]
 // silence kzg-rs lint as c-kzg will be used as default if both are enabled.
@@ -175,6 +177,10 @@ impl Precompiles {
                 precompiles.extend(bls12_381::precompiles());
                 precompiles
             };
+
+            // Add L1SLOAD precompile (RIP-7728)
+            let mut precompiles = precompiles;
+            precompiles.extend([l1sload::L1SLOAD]);
 
             Box::new(precompiles)
         })
